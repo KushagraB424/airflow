@@ -318,11 +318,6 @@ def ti_run(
     except DataError:
         # Let the app-level DataErrorHandler return a 422 (not the opaque 500 below).
         raise
-    except SQLAlchemyError:
-        log.exception("Error marking Task Instance state as running")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred"
-        )
 
     # JWTReissueMiddleware also writes Refreshed-API-Token but skips workload tokens, so we set it here for the workload→execution swap.
     if token.claims.scope == "workload":
@@ -477,8 +472,6 @@ def ti_update_state(
         if ti is not None:
             _handle_fail_fast_for_dag(ti=ti, dag_id=dag_id, session=session, dag_bag=dag_bag)
 
-    # TODO: Replace this with FastAPI's Custom Exception handling:
-    # https://fastapi.tiangolo.com/tutorial/handling-errors/#install-custom-exception-handlers
     try:
         result = session.execute(query)
         log.info(
@@ -502,11 +495,6 @@ def ti_update_state(
     except DataError:
         # Let DataErrorHandler return a 422 (not the opaque 500 below).
         raise
-    except SQLAlchemyError as e:
-        log.error("Error updating Task Instance state", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred"
-        )
 
     if updated_state == TaskInstanceState.SUCCESS:
         if conf.getboolean("state_store", "clear_on_success"):

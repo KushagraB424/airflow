@@ -32,11 +32,12 @@ from cadwyn import (
     Cadwyn,
     current_dependency_solver,
 )
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from opentelemetry import context as otel_context, propagate as otel_propagate
 from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy.exc import SQLAlchemyError
 
 from airflow.api_fastapi.auth.tokens import (
     JWTGenerator,
@@ -323,6 +324,14 @@ def create_task_execution_api_app(lifespan: svcs.fastapi.lifespan = lifespan) ->
         if correlation_id := request.headers.get("correlation-id"):
             content["correlation-id"] = correlation_id
         return JSONResponse(status_code=500, content=content)
+
+    @app.exception_handler(SQLAlchemyError)
+    def handle_sqlalchemy_exceptions(request: Request, exc: SQLAlchemyError):
+        logger.error("Database error occurred", error=str(exc))
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "Database error occurred"},
+        )
 
     return app
 
